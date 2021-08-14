@@ -5,10 +5,11 @@ name = "pypi"
 
 [packages]
 requests = {editable = true, git = "https://github.com/requests/requests.git"}
-numpy = "*"
+numpy = "==1.21.1"
 pandas = "*"
 yfinance = "*"
 yahoo-fin = "*"
+chardet = "*"
 
 [dev-packages]
 pipenv-setup = "*"
