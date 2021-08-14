@@ -1,0 +1,17 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+requests = {editable = true, git = "https://github.com/requests/requests.git"}
+numpy = "*"
+pandas = "*"
+yfinance = "*"
+yahoo-fin = "*"
+
+[dev-packages]
+pipenv-setup = "*"
+
+[requires]
+python_version = "3.8"
