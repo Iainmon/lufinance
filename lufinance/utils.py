@@ -21,7 +21,7 @@ def pdate(d) -> _pd.Timestamp:
 def mongodate(d) -> str:
     return str(pdate(d).date())
 
-def df(df) -> pd.DataFrame:
+def df(df) -> _pd.DataFrame:
     return _pd.DataFrame(df)
 
 def norm_date(d: str) -> str:

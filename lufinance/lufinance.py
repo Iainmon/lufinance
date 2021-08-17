@@ -134,7 +134,7 @@ class Share(Asset):
         assert type(dic) is dict
         super().__init__(asset_name='share')
         
-        
+
 class Option(Asset):
     
     aliases = {
@@ -213,7 +213,7 @@ class Option(Asset):
             return current_price < self.strike_price
 
     @staticmethod
-    def collection_from_query(query: object) -> list[Option]:
+    def collection_from_query(query: object) -> list[object]:
         return list(map(Option, list(query)))
     
     
@@ -246,7 +246,7 @@ class ExpirationCycle:
         self.__chain = []
     
     @staticmethod
-    def from_list(chain=[],copy=True) -> ExpirationCycle:
+    def from_list(chain=[],copy=True) -> object:
         assert len(chain) > 0
         fst = chain[0]
         assert type(fst) is Option
@@ -261,9 +261,10 @@ class ExpirationCycle:
         return this
     
     @staticmethod
-    def from_symbol_expiry_pair(ticker,date=None) -> Option:
+    def from_symbol_expiry_pair(ticker,date=None) -> object:
         exp_dates = list(options.get_expiration_dates(ticker)) if date is None else [ut.norm_date(date)]
         chain = list(map(Option,record_option_chains([ticker], [exp_dates[0]])))
+        print(chain)
         return ExpirationCycle.from_list(chain,copy=False) # Just constructed them. No need to copy.
         
         
@@ -286,7 +287,7 @@ class ExpirationCycle:
             return option.option_type == 'PUT'
         return list(filter(is_put,self.chain))
     
-    def append_option(self,option: Option) -> None:
+    def append_option(self,option: object) -> None:
         assert type(option) is Option
         self.chain.append(option)
         
