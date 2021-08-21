@@ -27,5 +27,12 @@ def get_current_stock_price(ticker):
             average = avg
     return average, averages
 
+@cachetools.func.ttl_cache(maxsize=512, ttl=500)
+def get_expiration_dates(*args,**kwargs):
+    return options.get_expiration_dates(*args,**kwargs)
+
+@cachetools.func.ttl_cache(maxsize=512, ttl=30)
+def get_options_chain(*args,**kwargs):
+    return options.get_options_chain(*args,**kwargs)
 # a, b = get_current_stock_price('AAPL')
 # print(a)

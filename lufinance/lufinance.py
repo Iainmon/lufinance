@@ -8,7 +8,8 @@
 from typing import TypeVar, Generic
 
 import yfinance as yf
-from yahoo_fin import options
+# from yahoo_fin import options
+import yahoo_fin as yfin
 import pandas as pd
 import json
 from pandas.core.common import flatten
@@ -16,12 +17,14 @@ import numpy as np
 import re
 from datetime import datetime
 import pytz
+import cachetools.func
+
 
 from qfin.options import BlackScholesCall
 from qfin.options import BlackScholesPut
 
 
-from .live_data import get_current_stock_price
+from . import live_data as live
 from . import utils as ut
 
 
@@ -81,11 +84,11 @@ def record_option_chains(tickers, dates=[],verbose=False):
     chains = []
     for ticker in tickers:
         if no_dates:
-            exp_dates = list(options.get_expiration_dates(ticker))
+            exp_dates = list(live.get_expiration_dates(ticker))
             dates = [str(pd.Timestamp(d).date()) for d in exp_dates]
         for date in dates:
             try:
-                opts = options.get_options_chain(ticker,date=date)
+                opts = live.get_options_chain(ticker,date=date)
                 processed_chain = record_option_chain(opts, ticker, expiration_date=date)
                 chains += processed_chain
             except ValueError as e:
@@ -116,6 +119,7 @@ class Asset():
         self.__asset_name = asset_name
 
 class Share(Asset):
+
     aliases = {
         'premium': 'price',
         'stock_price': 'price'
@@ -143,6 +147,11 @@ class Option(Asset):
         'type': 'option_type',
         'symbol': 'contract_symbol',
     }
+
+    stateful_methods = [
+        'in_the_money',
+        'current_asset_price'
+    ]
     
     def __setattr__(self, name, value):
         name = self.aliases.get(name, name)
@@ -158,7 +167,7 @@ class Option(Asset):
         super().__init__(asset_name='option')
         self.ticker = dic['ticker']
         self.contract_symbol = dic['contract_name'] if 'contract_name' in dic.keys() else dic['contract_symbol']
-        self.option_type = dic['option_type']
+        self.option_type = str(dic['option_type'])
         self.strike = dic['strike']
         self.expiration_date = dic['expiration_date']
         self.last_price = dic['last_price']
@@ -202,8 +211,8 @@ class Option(Asset):
         return json_str
     
     def current_asset_price(self) -> np.float64:
-        current_price,_ = get_current_stock_price(self.ticker)
-        return current_price
+        current_price,_ = live.get_current_stock_price(self.ticker)
+        return np.float64(current_price)
     
     def in_the_money(self) -> bool:
         current_price = self.current_asset_price()
@@ -211,7 +220,9 @@ class Option(Asset):
             return current_price > self.strike_price
         elif self.option_type == 'PUT':
             return current_price < self.strike_price
-
+        
+        raise ValueError(f'Option.option_type cannot be {self.option_type}')
+        
     @staticmethod
     def collection_from_query(query: object) -> list[object]:
         return list(map(Option, list(query)))
@@ -238,6 +249,13 @@ class ExpirationCycle:
     def chain(self) -> list[Option]:
         return self.__chain
     
+    @property
+    def cycle_type(self) -> str:
+        if len(self.chain) < 1:
+            return 'Call/Put'
+        first_option = self.chain[0]
+        return first_option.option_type
+
     def __init__(self,ticker='',expiration_date=None):
         assert ticker
         assert expiration_date
@@ -262,9 +280,8 @@ class ExpirationCycle:
     
     @staticmethod
     def from_symbol_expiry_pair(ticker,date=None) -> object:
-        exp_dates = list(options.get_expiration_dates(ticker)) if date is None else [ut.norm_date(date)]
+        exp_dates = list(live.get_expiration_dates(ticker)) if date is None else [ut.norm_date(date)]
         chain = list(map(Option,record_option_chains([ticker], [exp_dates[0]])))
-        print(chain)
         return ExpirationCycle.from_list(chain,copy=False) # Just constructed them. No need to copy.
         
         
@@ -290,7 +307,6 @@ class ExpirationCycle:
     def append_option(self,option: object) -> None:
         assert type(option) is Option
         self.chain.append(option)
-        
 
     def export(self, exclude_keys=[]) -> list[dict[str, object]]:
         options = []
@@ -307,6 +323,27 @@ class ExpirationCycle:
             
             options.append(opt_dic)
         return options
+
+    def group_by_in_the_money(self) -> dict[str, list[object]]:
+        group = {'in': [], 'out': []}
+        for op in self.chain:
+            if op.in_the_money():
+                group['in'].append(op)
+            else:
+                group['out'].append(op)
+        return group
     
+    def __str__(self) -> str:
+        chain = [op.as_dict() for op in self.chain]
+        return pd.DataFrame(chain).to_string()
     
-    
+    def __repr__(self) -> str:
+        itm_grouping = self.group_by_in_the_money()
+        in_itm, out_itm = len(itm_grouping['in']), len(itm_grouping['out'])
+        return '\n'.join([
+            f'Option Expiration Cycle ({self.cycle_type})',
+            f'Ticker: {self.ticker}',
+            f'Expiration Date: {self.expiration_date.date()}',
+            f'Contracts: {len(self.chain)}',
+            f'Contracts (in: {in_itm}, out: {out_itm}) of the money'
+        ])

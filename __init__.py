@@ -4,4 +4,6 @@
 
 
 from .lufinance import *
+from .notebooks import *
+
 __all__ = exports
